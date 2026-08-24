@@ -80,61 +80,56 @@ Important campaign actions are recorded in `activity_logs`, including:
 ```text
 campaign_management/
 │
-└── app
-    │   main.py
-    │   
-    ├───core
-    │   │   config.py
-    │   │   security.py
-    │   │   __init__.py
-    │  
-    │   
-    │           
-    ├───db
-    │   │   database.py
-    │   │   __init__.py
-    │   │   
-    │   └───__pycache__
-    │           database.cpython-314.pyc
-    │           __init__.cpython-314.pyc
-    │           
-    ├───dependencies
-    │   │   auth.py
-    │   │   role.py
-    │   │  __init__.py
-    │  
-    │           
-    ├───models
-    │   │   campaign.py
-    │   │   campaign_task.py
-    │   │   user.py
-    │   │   __init__.py
-    │   
-    │           
-    ├───routers
-    │   │   auth.py
-    │   │   campaign.py
-    │   │   users.py
-    │
-    │           
-    ├───schemas
-    │   │   auth.py
-    │   │   campaign.py
-    │   │   campaign_task.py
-    │   │   response.py
-    │   │   user.py
-    │   │   __init__.py
-    |
-    │           
-    ├───services
-    │   │   auth.py
-    │   │   campaign.py
-    │   │   user.py
-    │   
-    │           
-    ├───utils
-    │   │   exceptions.py
-    │   │   rate_limit.py
+├── app/
+│   ├── main.py
+│   │
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   └── security.py
+│   │
+│   ├── db/
+│   │   ├── __init__.py
+│   │   └── database.py
+│   │
+│   ├── dependencies/
+│   │   ├── __init__.py
+│   │   ├── auth.py
+│   │   └── role.py
+│   │
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── campaign.py
+│   │   ├── campaign_task.py
+│   │   └── user.py
+│   │
+│   ├── routers/
+│   │   ├── auth.py
+│   │   ├── campaign.py
+│   │   └── users.py
+│   │
+│   ├── schemas/
+│   │   ├── __init__.py
+│   │   ├── auth.py
+│   │   ├── campaign.py
+│   │   ├── campaign_task.py
+│   │   ├── response.py
+│   │   └── user.py
+│   │
+│   ├── services/
+│   │   ├── auth.py
+│   │   ├── campaign.py
+│   │   └── user.py
+│   │
+│   └── utils/
+│       ├── exceptions.py
+│       └── rate_limit.py
+│
+├── .env
+├── .env.example
+├── .gitignore
+├── README.md
+└── requirements.txt
     
 ```
 
