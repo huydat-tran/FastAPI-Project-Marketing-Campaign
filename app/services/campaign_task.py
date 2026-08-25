@@ -1,6 +1,6 @@
+from sqlalchemy import asc, desc
 from sqlalchemy.orm import Session
 
-from app.models.campaign import CampaignMemberRole
 from app.models.campaign_task import CampaignTask
 from app.models.user import User
 from app.schemas.campaign_task import (
@@ -8,14 +8,13 @@ from app.schemas.campaign_task import (
     CampaignTaskUpdate,
 )
 from app.services.campaign import (
-    get_campaign_by_id,
     get_campaign_member,
+    require_campaign_member,
 )
-from app.services.user import get_user_by_id
 from app.utils.exceptions import AppException
 
 
-def get_campaign_task_by_id(
+def get_task_by_id(
     db: Session,
     task_id: int,
 ) -> CampaignTask | None:
@@ -28,6 +27,28 @@ def get_campaign_task_by_id(
     )
 
 
+def require_task_member(
+    db: Session,
+    task_id: int,
+    user_id: int,
+) -> CampaignTask:
+    task = get_task_by_id(db, task_id)
+
+    if task is None:
+        raise AppException(
+            status_code=404,
+            message="Campaign task not found",
+        )
+
+    require_campaign_member(
+        db,
+        task.campaign_id,
+        user_id,
+    )
+
+    return task
+
+
 def validate_assignee(
     db: Session,
     campaign_id: int,
@@ -36,15 +57,18 @@ def validate_assignee(
     if assignee_id is None:
         return
 
-    user = get_user_by_id(
-        db,
-        assignee_id,
+    user = (
+        db.query(User)
+        .filter(
+            User.id == assignee_id,
+        )
+        .first()
     )
 
     if user is None:
         raise AppException(
             status_code=404,
-            message="Assignee not found",
+            message="Assignee user not found",
         )
 
     member = get_campaign_member(
@@ -59,12 +83,6 @@ def validate_assignee(
             message="Assignee must be a member of this campaign",
         )
 
-    if not user.is_active:
-        raise AppException(
-            status_code=400,
-            message="Assignee account is inactive",
-        )
-
 
 def create_campaign_task(
     db: Session,
@@ -72,16 +90,17 @@ def create_campaign_task(
     data: CampaignTaskCreate,
     current_user: User,
 ) -> CampaignTask:
-    campaign = get_campaign_by_id(
+    require_campaign_member(
         db,
         campaign_id,
+        current_user.id,
     )
 
-    if campaign is None:
-        raise AppException(
-            status_code=404,
-            message="Campaign not found",
-        )
+    validate_assignee(
+        db,
+        campaign_id,
+        data.assignee_id,
+    )
 
     title = data.title.strip()
 
@@ -90,12 +109,6 @@ def create_campaign_task(
             status_code=400,
             message="Task title cannot be empty",
         )
-
-    validate_assignee(
-        db,
-        campaign_id,
-        data.assignee_id,
-    )
 
     task = CampaignTask(
         campaign_id=campaign_id,
@@ -108,7 +121,6 @@ def create_campaign_task(
     )
 
     db.add(task)
-
     db.commit()
     db.refresh(task)
 
@@ -118,66 +130,65 @@ def create_campaign_task(
 def get_campaign_tasks(
     db: Session,
     campaign_id: int,
-    search: str | None = None,
-    status=None,
-    priority=None,
+    current_user: User,
+    status: str | None = None,
+    priority: str | None = None,
     assignee_id: int | None = None,
-    limit: int = 20,
+    search: str | None = None,
+    limit: int = 10,
     offset: int = 0,
-    sort: str = "created_at",
-    order: str = "desc",
+    sort_by: str = "created_at",
+    sort_order: str = "desc",
 ) -> list[CampaignTask]:
-    campaign = get_campaign_by_id(
+    require_campaign_member(
         db,
         campaign_id,
+        current_user.id,
     )
-
-    if campaign is None:
-        raise AppException(
-            status_code=404,
-            message="Campaign not found",
-        )
 
     query = db.query(CampaignTask).filter(
         CampaignTask.campaign_id == campaign_id,
     )
 
+    if status is not None:
+        query = query.filter(
+            CampaignTask.status == status,
+        )
+
+    if priority is not None:
+        query = query.filter(
+            CampaignTask.priority == priority,
+        )
+
+    if assignee_id is not None:
+        query = query.filter(
+            CampaignTask.assignee_id == assignee_id,
+        )
+
     if search:
         search = search.strip()
 
         if search:
-            query = query.filter(CampaignTask.title.ilike(f"%{search}%"))
+            query = query.filter(
+                CampaignTask.title.ilike(f"%{search}%"),
+            )
 
-    if status is not None:
-        query = query.filter(CampaignTask.status == status)
-
-    if priority is not None:
-        query = query.filter(CampaignTask.priority == priority)
-
-    if assignee_id is not None:
-        query = query.filter(CampaignTask.assignee_id == assignee_id)
-
-    sort_columns = {
-        "created_at": CampaignTask.created_at,
-        "due_date": CampaignTask.due_date,
-    }
-
-    sort_column = sort_columns.get(sort)
-
-    if sort_column is None:
-        raise AppException(
-            status_code=400,
-            message="Invalid sort field. Allowed values: created_at, due_date",
-        )
-
-    if order.lower() == "asc":
-        query = query.order_by(sort_column.asc())
-    elif order.lower() == "desc":
-        query = query.order_by(sort_column.desc())
+    if sort_by == "due_date":
+        sort_column = CampaignTask.due_date
+    elif sort_by == "created_at":
+        sort_column = CampaignTask.created_at
     else:
         raise AppException(
-            status_code=400,
-            message="Invalid sort order. Allowed values: asc, desc",
+            status_code=403, message="Can only sort by created_at and due_Date"
+        )
+
+    if sort_order.lower() == "asc":
+        query = query.order_by(
+            asc(sort_column),
+        )
+    else:
+        query = query.order_by(
+            desc(sort_column),
         )
 
     return query.offset(offset).limit(limit).all()
@@ -186,30 +197,13 @@ def get_campaign_tasks(
 def get_campaign_task_detail(
     db: Session,
     task_id: int,
+    current_user: User,
 ) -> CampaignTask:
-    task = get_campaign_task_by_id(
+    return require_task_member(
         db,
         task_id,
+        current_user.id,
     )
-
-    if task is None:
-        raise AppException(
-            status_code=404,
-            message="Campaign task not found",
-        )
-
-    campaign = get_campaign_by_id(
-        db,
-        task.campaign_id,
-    )
-
-    if campaign is None:
-        raise AppException(
-            status_code=404,
-            message="Campaign not found",
-        )
-
-    return task
 
 
 def update_campaign_task(
@@ -218,26 +212,19 @@ def update_campaign_task(
     data: CampaignTaskUpdate,
     current_user: User,
 ) -> CampaignTask:
-    task = get_campaign_task_by_id(
+    task = require_task_member(
         db,
         task_id,
+        current_user.id,
     )
 
-    if task is None:
+    if (
+        task.campaign.owner_id != current_user.id
+        and task.assignee_id != current_user.id
+    ):
         raise AppException(
-            status_code=404,
-            message="Campaign task not found",
-        )
-
-    campaign = get_campaign_by_id(
-        db,
-        task.campaign_id,
-    )
-
-    if campaign is None:
-        raise AppException(
-            status_code=404,
-            message="Campaign not found",
+            status_code=403,
+            message="You don't have permission to update this task",
         )
 
     update_data = data.model_dump(
@@ -256,19 +243,7 @@ def update_campaign_task(
         update_data["title"] = title
 
     if "assignee_id" in update_data:
-        member = get_campaign_member(
-            db,
-            task.campaign_id,
-            current_user.id,
-        )
-
-        if member is None:
-            raise AppException(
-                status_code=403,
-                message="You are not a member of this campaign",
-            )
-
-        if member.role != CampaignMemberRole.OWNER:
+        if task.campaign.owner_id != current_user.id:
             raise AppException(
                 status_code=403,
                 message="Only the campaign owner can change the assignee",
@@ -296,29 +271,19 @@ def update_campaign_task(
 def delete_campaign_task(
     db: Session,
     task_id: int,
+    current_user: User,
 ) -> None:
-    task = get_campaign_task_by_id(
+    task = require_task_member(
         db,
         task_id,
+        current_user.id,
     )
 
-    if task is None:
+    if task.campaign.owner_id != current_user.id:
         raise AppException(
-            status_code=404,
-            message="Campaign task not found",
-        )
-
-    campaign = get_campaign_by_id(
-        db,
-        task.campaign_id,
-    )
-
-    if campaign is None:
-        raise AppException(
-            status_code=404,
-            message="Campaign not found",
+            status_code=403,
+            message="Only the campaign owner can delete this task",
         )
 
     db.delete(task)
-
     db.commit()

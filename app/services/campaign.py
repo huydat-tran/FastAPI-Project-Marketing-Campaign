@@ -22,6 +22,7 @@ def get_campaign_by_id(
     db: Session,
     campaign_id: int,
 ) -> Campaign | None:
+
     return (
         db.query(Campaign)
         .filter(
@@ -37,6 +38,7 @@ def get_campaign_member(
     campaign_id: int,
     user_id: int,
 ) -> CampaignMember | None:
+
     return (
         db.query(CampaignMember)
         .filter(
@@ -47,12 +49,69 @@ def get_campaign_member(
     )
 
 
+def require_campaign_member(
+    db: Session,
+    campaign_id: int,
+    user_id: int,
+) -> Campaign:
+
+    campaign = get_campaign_by_id(
+        db,
+        campaign_id,
+    )
+
+    if campaign is None:
+        raise AppException(
+            status_code=404,
+            message="Campaign not found",
+        )
+
+    if not get_campaign_member(
+        db,
+        campaign_id,
+        user_id,
+    ):
+        raise AppException(
+            status_code=403,
+            message="You are not a member of this campaign",
+        )
+
+    return campaign
+
+
+def require_campaign_owner(
+    db: Session,
+    campaign_id: int,
+    user_id: int,
+) -> Campaign:
+
+    campaign = get_campaign_by_id(
+        db,
+        campaign_id,
+    )
+
+    if campaign is None:
+        raise AppException(
+            status_code=404,
+            message="Campaign not found",
+        )
+
+    if campaign.owner_id != user_id:
+        raise AppException(
+            status_code=403,
+            message="Only the campaign owner can perform this action",
+        )
+
+    return campaign
+
+
 def create_activity_log(
     db: Session,
     campaign_id: int,
     user_id: int,
     action: ActivityAction,
 ) -> ActivityLog:
+
     activity_log = ActivityLog(
         campaign_id=campaign_id,
         user_id=user_id,
@@ -69,6 +128,7 @@ def create_campaign(
     data: CampaignCreate,
     current_user: User,
 ) -> Campaign:
+
     name = data.name.strip()
 
     if not name:
@@ -84,6 +144,7 @@ def create_campaign(
     )
 
     db.add(campaign)
+
     db.flush()
 
     owner_member = CampaignMember(
@@ -102,6 +163,7 @@ def create_campaign(
     )
 
     db.commit()
+
     db.refresh(campaign)
 
     return campaign
@@ -112,6 +174,7 @@ def get_campaigns(
     current_user: User,
     search: str | None = None,
 ) -> list[Campaign]:
+
     query = (
         db.query(Campaign)
         .join(
@@ -136,19 +199,14 @@ def get_campaigns(
 def get_campaign_detail(
     db: Session,
     campaign_id: int,
+    current_user: User,
 ) -> Campaign:
-    campaign = get_campaign_by_id(
+
+    return require_campaign_member(
         db,
         campaign_id,
+        current_user.id,
     )
-
-    if campaign is None:
-        raise AppException(
-            status_code=404,
-            message="Campaign not found",
-        )
-
-    return campaign
 
 
 def update_campaign(
@@ -157,16 +215,12 @@ def update_campaign(
     data: CampaignUpdate,
     current_user: User,
 ) -> Campaign:
-    campaign = get_campaign_by_id(
+
+    campaign = require_campaign_owner(
         db,
         campaign_id,
+        current_user.id,
     )
-
-    if campaign is None:
-        raise AppException(
-            status_code=404,
-            message="Campaign not found",
-        )
 
     update_data = data.model_dump(
         exclude_unset=True,
@@ -198,6 +252,7 @@ def update_campaign(
     )
 
     db.commit()
+
     db.refresh(campaign)
 
     return campaign
@@ -206,17 +261,14 @@ def update_campaign(
 def delete_campaign(
     db: Session,
     campaign_id: int,
+    current_user: User,
 ) -> None:
-    campaign = get_campaign_by_id(
+
+    campaign = require_campaign_owner(
         db,
         campaign_id,
+        current_user.id,
     )
-
-    if campaign is None:
-        raise AppException(
-            status_code=404,
-            message="Campaign not found",
-        )
 
     campaign.deleted_at = datetime.now(timezone.utc)
 
@@ -229,13 +281,14 @@ def add_campaign_member(
     data: CampaignMemberCreate,
     current_user: User,
 ) -> CampaignMember:
-    user = (
-        db.query(User)
-        .filter(
-            User.id == data.user_id,
-        )
-        .first()
+
+    require_campaign_owner(
+        db,
+        campaign_id,
+        current_user.id,
     )
+
+    user = db.query(User).filter(User.id == data.user_id).first()
 
     if user is None:
         raise AppException(
@@ -255,12 +308,6 @@ def add_campaign_member(
             message="User is already a member of this campaign",
         )
 
-    if data.role == CampaignMemberRole.OWNER:
-        raise AppException(
-            status_code=400,
-            message="A new member cannot be assigned the OWNER role",
-        )
-
     member = CampaignMember(
         campaign_id=campaign_id,
         user_id=data.user_id,
@@ -277,6 +324,7 @@ def add_campaign_member(
     )
 
     db.commit()
+
     db.refresh(member)
 
     return member
@@ -285,17 +333,14 @@ def add_campaign_member(
 def get_campaign_members(
     db: Session,
     campaign_id: int,
+    current_user: User,
 ) -> list[CampaignMember]:
-    campaign = get_campaign_by_id(
+
+    require_campaign_member(
         db,
         campaign_id,
+        current_user.id,
     )
-
-    if campaign is None:
-        raise AppException(
-            status_code=404,
-            message="Campaign not found",
-        )
 
     return (
         db.query(CampaignMember)
@@ -313,6 +358,13 @@ def remove_campaign_member(
     user_id: int,
     current_user: User,
 ) -> None:
+
+    require_campaign_owner(
+        db,
+        campaign_id,
+        current_user.id,
+    )
+
     member = get_campaign_member(
         db,
         campaign_id,

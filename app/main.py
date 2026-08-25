@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 
 import app.models
 from app.db.database import Base, engine
-from app.routers import auth, campaign, campaign_task, users
+from app.routers import auth, campaign, campaign_task, users, task_comment
 from app.utils.exceptions import AppException
 
 Base.metadata.create_all(bind=engine)
@@ -20,6 +20,7 @@ app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(campaign.router)
 app.include_router(campaign_task.router)
+app.include_router(task_comment.router)
 
 
 @app.exception_handler(AppException)

@@ -1,12 +1,17 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.campaign_task import TaskPriority, TaskStatus
 
 
 class CampaignTaskCreate(BaseModel):
-    title: str
+    title: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+    )
+
     description: str | None = None
     assignee_id: int | None = None
     status: TaskStatus = TaskStatus.TODO
@@ -15,7 +20,12 @@ class CampaignTaskCreate(BaseModel):
 
 
 class CampaignTaskUpdate(BaseModel):
-    title: str | None = None
+    title: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=255,
+    )
+
     description: str | None = None
     assignee_id: int | None = None
     status: TaskStatus | None = None
@@ -34,4 +44,6 @@ class CampaignTaskResponse(BaseModel):
     due_date: datetime | None
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
