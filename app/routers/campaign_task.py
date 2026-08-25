@@ -57,8 +57,8 @@ def create_task(
 def list_tasks(
     campaign_id: int,
     search: str | None = Query(default=None),
-    status: CampaignTaskStatus | None = Query(default=None),
-    priority: CampaignTaskPriority | None = Query(default=None),
+    status: CampaignTaskStatus | None = Query(default=None),  # noqa: B008
+    priority: CampaignTaskPriority | None = Query(default=None),  # noqa: B008
     assignee_id: int | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -130,4 +130,3 @@ def delete_task(
         task_id,
         current_user,
     )
-    return None
