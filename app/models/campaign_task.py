@@ -27,38 +27,46 @@ class CampaignTask(Base):
         primary_key=True,
         autoincrement=True,
     )
+
     campaign_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("campaigns.id"),
         nullable=False,
     )
+
     title: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
     )
+
     description: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
+
     assignee_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("users.id"),
         nullable=True,
     )
+
     status: Mapped[TaskStatus] = mapped_column(
         Enum(TaskStatus),
         default=TaskStatus.TODO,
         nullable=False,
     )
+
     priority: Mapped[TaskPriority] = mapped_column(
         Enum(TaskPriority),
         default=TaskPriority.MEDIUM,
         nullable=False,
     )
+
     due_date: Mapped[datetime | None] = mapped_column(
         DateTime,
         nullable=True,
     )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=func.now(),
@@ -73,4 +81,16 @@ class CampaignTask(Base):
     assignee = relationship(
         "User",
         back_populates="tasks",
+    )
+
+    comments = relationship(
+        "TaskComment",
+        back_populates="task",
+        cascade="all, delete-orphan",
+    )
+
+    attachments = relationship(
+        "TaskAttachment",
+        back_populates="task",
+        cascade="all, delete-orphan",
     )

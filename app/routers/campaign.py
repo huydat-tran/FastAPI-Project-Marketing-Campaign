@@ -3,6 +3,10 @@ from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.dependencies.auth import get_current_user
+from app.dependencies.campaign import (
+    require_campaign_member,
+    require_campaign_owner,
+)
 from app.models.user import User
 from app.schemas.campaign import (
     CampaignCreate,
@@ -40,13 +44,17 @@ def list_my_campaign(
     current_user: User = Depends(get_current_user),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
 ):
-    return get_campaigns(db, current_user, search)
+    return get_campaigns(
+        db,
+        current_user,
+        search,
+    )
 
 
 @router.get("/{campaign_id}", response_model=CampaignResponse)
 def get_campaign(
     campaign_id: int,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(require_campaign_member),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
 ):
     return get_campaign_detail(db, campaign_id, current_user)
@@ -56,7 +64,7 @@ def get_campaign(
 def update_existing_campaign(
     campaign_id: int,
     data: CampaignUpdate,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(require_campaign_owner),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
 ):
     return update_campaign(db, campaign_id, data, current_user)
@@ -65,7 +73,7 @@ def update_existing_campaign(
 @router.delete("/{campaign_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_existing_campaign(
     campaign_id: int,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(require_campaign_owner),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
 ):
     delete_campaign(db, campaign_id, current_user)
@@ -79,7 +87,7 @@ def delete_existing_campaign(
 def add_member(
     campaign_id: int,
     data: CampaignMemberCreate,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(require_campaign_owner),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
 ):
     return add_campaign_member(db, campaign_id, data, current_user)
@@ -88,7 +96,7 @@ def add_member(
 @router.get("/{campaign_id}/members", response_model=list[CampaignMemberResponse])
 def list_member(
     campaign_id: int,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(require_campaign_member),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
 ):
     return get_campaign_members(db, campaign_id, current_user)
@@ -101,7 +109,7 @@ def list_member(
 def delete_member(
     campaign_id: int,
     user_id: int,
-    current_user: User = Depends(get_current_user),  # noqa: B008
+    current_user: User = Depends(require_campaign_owner),  # noqa: B008
     db: Session = Depends(get_db),  # noqa: B008
 ):
     remove_campaign_member(

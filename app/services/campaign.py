@@ -47,60 +47,6 @@ def get_campaign_member(
     )
 
 
-def require_campaign_member(
-    db: Session,
-    campaign_id: int,
-    user_id: int,
-) -> Campaign:
-    campaign = get_campaign_by_id(
-        db,
-        campaign_id,
-    )
-
-    if campaign is None:
-        raise AppException(
-            status_code=404,
-            message="Campaign not found",
-        )
-
-    if not get_campaign_member(
-        db,
-        campaign_id,
-        user_id,
-    ):
-        raise AppException(
-            status_code=403,
-            message="You are not a member of this campaign",
-        )
-
-    return campaign
-
-
-def require_campaign_owner(
-    db: Session,
-    campaign_id: int,
-    user_id: int,
-) -> Campaign:
-    campaign = get_campaign_by_id(
-        db,
-        campaign_id,
-    )
-
-    if campaign is None:
-        raise AppException(
-            status_code=404,
-            message="Campaign not found",
-        )
-
-    if campaign.owner_id != user_id:
-        raise AppException(
-            status_code=403,
-            message="Only the campaign owner can perform this action",
-        )
-
-    return campaign
-
-
 def create_activity_log(
     db: Session,
     campaign_id: int,
@@ -138,7 +84,6 @@ def create_campaign(
     )
 
     db.add(campaign)
-
     db.flush()
 
     owner_member = CampaignMember(
@@ -191,13 +136,19 @@ def get_campaigns(
 def get_campaign_detail(
     db: Session,
     campaign_id: int,
-    current_user: User,
 ) -> Campaign:
-    return require_campaign_member(
+    campaign = get_campaign_by_id(
         db,
         campaign_id,
-        current_user.id,
     )
+
+    if campaign is None:
+        raise AppException(
+            status_code=404,
+            message="Campaign not found",
+        )
+
+    return campaign
 
 
 def update_campaign(
@@ -206,11 +157,16 @@ def update_campaign(
     data: CampaignUpdate,
     current_user: User,
 ) -> Campaign:
-    campaign = require_campaign_owner(
+    campaign = get_campaign_by_id(
         db,
         campaign_id,
-        current_user.id,
     )
+
+    if campaign is None:
+        raise AppException(
+            status_code=404,
+            message="Campaign not found",
+        )
 
     update_data = data.model_dump(
         exclude_unset=True,
@@ -250,13 +206,17 @@ def update_campaign(
 def delete_campaign(
     db: Session,
     campaign_id: int,
-    current_user: User,
 ) -> None:
-    campaign = require_campaign_owner(
+    campaign = get_campaign_by_id(
         db,
         campaign_id,
-        current_user.id,
     )
+
+    if campaign is None:
+        raise AppException(
+            status_code=404,
+            message="Campaign not found",
+        )
 
     campaign.deleted_at = datetime.now(timezone.utc)
 
@@ -269,13 +229,13 @@ def add_campaign_member(
     data: CampaignMemberCreate,
     current_user: User,
 ) -> CampaignMember:
-    require_campaign_owner(
-        db,
-        campaign_id,
-        current_user.id,
+    user = (
+        db.query(User)
+        .filter(
+            User.id == data.user_id,
+        )
+        .first()
     )
-
-    user = db.query(User).filter(User.id == data.user_id).first()
 
     if user is None:
         raise AppException(
@@ -325,13 +285,17 @@ def add_campaign_member(
 def get_campaign_members(
     db: Session,
     campaign_id: int,
-    current_user: User,
 ) -> list[CampaignMember]:
-    require_campaign_member(
+    campaign = get_campaign_by_id(
         db,
         campaign_id,
-        current_user.id,
     )
+
+    if campaign is None:
+        raise AppException(
+            status_code=404,
+            message="Campaign not found",
+        )
 
     return (
         db.query(CampaignMember)
@@ -349,12 +313,6 @@ def remove_campaign_member(
     user_id: int,
     current_user: User,
 ) -> None:
-    require_campaign_owner(
-        db,
-        campaign_id,
-        current_user.id,
-    )
-
     member = get_campaign_member(
         db,
         campaign_id,
