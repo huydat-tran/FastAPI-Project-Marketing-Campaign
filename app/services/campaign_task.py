@@ -179,16 +179,20 @@ def get_campaign_tasks(
         sort_column = CampaignTask.created_at
     else:
         raise AppException(
-            status_code=403, message="Can only sort by created_at and due_Date"
+            status_code=400, message="Can only sort by created_at and due_date"
         )
 
     if sort_order.lower() == "asc":
         query = query.order_by(
             asc(sort_column),
         )
-    else:
+    elif sort_order.lower() == "desc":
         query = query.order_by(
             desc(sort_column),
+        )
+    else:
+        raise AppException(
+            status_code=400, message="Invalid sort order. Allowed values: asc, desc"
         )
 
     return query.offset(offset).limit(limit).all()

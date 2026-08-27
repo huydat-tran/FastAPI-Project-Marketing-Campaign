@@ -21,7 +21,7 @@ def create_task_comment(
     content = data.content.strip()
 
     if not content:
-        raise AppException(status_code=404, message="Content cannot be empty")
+        raise AppException(status_code=400, message="Content cannot be empty")
 
     comment = TaskComment(task_id=task_id, user_id=current_user.id, content=content)
 
