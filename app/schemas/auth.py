@@ -16,7 +16,7 @@ class RegisterRequest(BaseModel):
             raise ValueError("Password must contain atleast one uppercase letter")
 
         if not any(char.islower() for char in password):
-            raise ValueError("Password must contain atleast one number")
+            raise ValueError("Password must contain atleast lowercase letter")
 
         return password
 

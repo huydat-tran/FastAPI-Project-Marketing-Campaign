@@ -6,7 +6,6 @@ from pydantic import BaseModel, ConfigDict
 class TaskAttachmentResponse(BaseModel):
     id: int
     task_id: int
-    uploaded_by: int
     original_filename: str
     stored_filename: str
     content_type: str
